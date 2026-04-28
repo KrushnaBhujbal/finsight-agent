@@ -124,6 +124,7 @@ def _fetch_and_clean(url: str) -> str:
 
     response = requests.get(url, headers=HEADERS, timeout=20)
     if response.status_code != 200:
+        
         return "Filing text unavailable."
 
     from bs4 import BeautifulSoup

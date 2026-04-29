@@ -11,52 +11,40 @@ logging.basicConfig(
 )
 log = logging.getLogger("finsight")
 
-from tools.sec_edgar import fetch_10k
-from tools.embeddings import embed_filing
-from tools.rag_query import ask_filing
+from agents.sec_agent import SECAgent
 
-TICKER = "AAPL"
-COMPANY = "Apple Inc."
+agent = SECAgent()
 
 print(f"\n{'='*60}")
-print(f"FinSight RAG Pipeline — {COMPANY} ({TICKER})")
+print("SECAgent — Test on 2 companies")
 print(f"{'='*60}")
 
-# Step 1 — fetch and embed (skip if already done)
-import chromadb
-client = chromadb.PersistentClient(path="chroma_db")
-collections = [c.name for c in client.list_collections()]
-
-if f"filing_{TICKER.lower()}" not in collections:
-    print(f"\nFetching and embedding 10-K for {TICKER}...")
-    filing = fetch_10k(TICKER)
-    embed_filing(TICKER, filing.raw_text, filing.filing_date)
-    print(f"Embedded {filing.word_count:,} words")
-else:
-    print(f"\nUsing cached embedding for {TICKER}")
-
-# Step 2 — RAG questions
-questions = [
-    "What are Apple's main risk factors?",
-    "What is Apple's revenue and how did it perform this year?",
-    "What does Apple say about competition in its markets?",
-    "What are Apple's main products and services?",
-    "What does Apple say about artificial intelligence?",
+tests = [
+    ("AAPL", "Apple Inc.", [
+        "What are Apple's main risk factors?",
+        "What products and services does Apple offer?",
+        "What does Apple say about competition?",
+    ]),
+    ("MSFT", "Microsoft Corporation", [
+        "What are Microsoft's main business segments?",
+        "What risk factors does Microsoft highlight?",
+    ]),
 ]
 
+for ticker, company, questions in tests:
+    print(f"\n{'─'*60}")
+    print(f"Company: {company} ({ticker})")
+    print(f"{'─'*60}")
+
+    results = agent.batch_analyze(ticker, questions, company)
+
+    for result in results:
+        print(f"\nQ: {result.question}")
+        print(f"A: {result.answer}")
+        print(f"   Chunks: {result.chunks_used} | Relevance: {result.relevance_scores}")
+        print(f"   Grounded: {result.grounded}")
+
 print(f"\n{'='*60}")
-print(f"Answering {len(questions)} questions from the real 10-K")
+print("Day 9 complete. SECAgent class working.")
+print("Ready for Week 3 — multi-agent system with CrewAI.")
 print(f"{'='*60}")
-
-for question in questions:
-    print(f"\nQ: {question}")
-    print("-" * 60)
-    result = ask_filing(TICKER, question, COMPANY)
-    print(f"A: {result['answer']}")
-    print(f"\nSources: chunks {[s['chunk_idx'] for s in result['sources']]} "
-          f"| relevance: {[s['relevance'] for s in result['sources']]}")
-    print()
-
-print(f"{'='*60}")
-print("Day 8 complete. RAG pipeline fully working.")
-print("LLM answers are now grounded in real 2025 Apple 10-K.")

@@ -12,60 +12,51 @@ logging.basicConfig(
 log = logging.getLogger("finsight")
 
 from tools.sec_edgar import fetch_10k
-from tools.embeddings import embed_filing, query_filing
-import chromadb
-
-# clear old bad chunks first
-client = chromadb.PersistentClient(path="chroma_db")
-try:
-    client.delete_collection("filing_aapl")
-    log.info("Cleared old AAPL collection")
-except:
-    pass
+from tools.embeddings import embed_filing
+from tools.rag_query import ask_filing
 
 TICKER = "AAPL"
+COMPANY = "Apple Inc."
 
-print(f"\n{'='*55}")
-print(f"Step 1 — Fetch 10-K with section extraction")
-print(f"{'='*55}")
+print(f"\n{'='*60}")
+print(f"FinSight RAG Pipeline — {COMPANY} ({TICKER})")
+print(f"{'='*60}")
 
-filing = fetch_10k(TICKER)
-print(f"Company:   {filing.company_name}")
-print(f"Filed:     {filing.filing_date}")
-print(f"Words:     {filing.word_count:,}")
-print(f"Sections:  {list(filing.sections.keys())}")
+# Step 1 — fetch and embed (skip if already done)
+import chromadb
+client = chromadb.PersistentClient(path="chroma_db")
+collections = [c.name for c in client.list_collections()]
 
-if filing.sections:
-    for name, text in filing.sections.items():
-        print(f"\n--- {name.upper()} (first 300 chars) ---")
-        print(text[:300])
+if f"filing_{TICKER.lower()}" not in collections:
+    print(f"\nFetching and embedding 10-K for {TICKER}...")
+    filing = fetch_10k(TICKER)
+    embed_filing(TICKER, filing.raw_text, filing.filing_date)
+    print(f"Embedded {filing.word_count:,} words")
+else:
+    print(f"\nUsing cached embedding for {TICKER}")
 
-print(f"\n{'='*55}")
-print(f"Step 2 — Embed clean sections into ChromaDB")
-print(f"{'='*55}")
-
-n_chunks = embed_filing(TICKER, filing.raw_text, filing.filing_date)
-print(f"Chunks embedded: {n_chunks}")
-
-print(f"\n{'='*55}")
-print(f"Step 3 — Semantic search with real content")
-print(f"{'='*55}")
-
+# Step 2 — RAG questions
 questions = [
-    "What are the main risk factors?",
-    "What is Apple's revenue and financial performance?",
-    "What does Apple say about competition?",
-    "What are Apple's products and services?",
+    "What are Apple's main risk factors?",
+    "What is Apple's revenue and how did it perform this year?",
+    "What does Apple say about competition in its markets?",
+    "What are Apple's main products and services?",
+    "What does Apple say about artificial intelligence?",
 ]
+
+print(f"\n{'='*60}")
+print(f"Answering {len(questions)} questions from the real 10-K")
+print(f"{'='*60}")
 
 for question in questions:
     print(f"\nQ: {question}")
-    print("-" * 50)
-    hits = query_filing(TICKER, question, n_results=1)
-    for hit in hits:
-        print(f"[Chunk {hit['chunk_idx']} | relevance: {1-hit['distance']:.2f}]")
-        print(f"{hit['chunk'][:400]}")
-        print()
+    print("-" * 60)
+    result = ask_filing(TICKER, question, COMPANY)
+    print(f"A: {result['answer']}")
+    print(f"\nSources: chunks {[s['chunk_idx'] for s in result['sources']]} "
+          f"| relevance: {[s['relevance'] for s in result['sources']]}")
+    print()
 
-print(f"{'='*55}")
-print("Day 7 complete. Clean section extraction working.")
+print(f"{'='*60}")
+print("Day 8 complete. RAG pipeline fully working.")
+print("LLM answers are now grounded in real 2025 Apple 10-K.")

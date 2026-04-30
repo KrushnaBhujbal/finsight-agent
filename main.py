@@ -12,34 +12,35 @@ logging.basicConfig(
 log = logging.getLogger("finsight")
 
 from agents.data_collector_agent import DataCollectorAgent
+from agents.sentiment_agent import SentimentAgent
 
-agent = DataCollectorAgent()
+tickers = [
+    ("AAPL", "Apple Inc."),
+    ("NVDA", "NVIDIA Corporation"),
+]
 
-tickers = ["AAPL", "MSFT", "NVDA"]
+data_agent = DataCollectorAgent()
+sentiment_agent = SentimentAgent()
+
+for ticker, company in tickers:
+    print(f"\n{'='*60}")
+    print(f"{company} ({ticker})")
+    print(f"{'='*60}")
+
+    stock = data_agent.run(ticker)
+    print(f"\n[DataCollector] {stock.valuation_signal.upper()} | {stock.price_vs_52w.upper()} | ${stock.price}")
+
+    sentiment = sentiment_agent.run(ticker, company)
+    print(f"\n[Sentiment] {sentiment.overall_sentiment.upper()} | score: {sentiment.sentiment_score} | risk: {sentiment.news_driven_risk.upper()}")
+    print(f"Breakdown: {sentiment.bullish_count}B / {sentiment.neutral_count}N / {sentiment.bearish_count}Be")
+    print(f"Summary: {sentiment.sentiment_summary}")
+
+    print(f"\n--- Formatted handoff to next agent ---")
+    print(data_agent.format_for_next_agent(stock))
+    print()
+    print(sentiment_agent.format_for_next_agent(sentiment))
 
 print(f"\n{'='*60}")
-print("DataCollectorAgent — 3 stocks")
-print(f"{'='*60}")
-
-outputs = []
-for ticker in tickers:
-    print(f"\n--- {ticker} ---")
-    result = agent.run(ticker)
-    outputs.append(result)
-
-    print(f"Price:         ${result.price}")
-    print(f"P/E:           {result.pe_ratio}")
-    print(f"Valuation:     {result.valuation_signal}")
-    print(f"52w Position:  {result.price_vs_52w}")
-    print(f"Analyst:       {result.analyst_recommendation.upper()}")
-    print(f"Summary:       {result.summary}")
-
-print(f"\n{'='*60}")
-print("Formatted output for next agent:")
-print(f"{'='*60}")
-print(agent.format_for_next_agent(outputs[0]))
-
-print(f"\n{'='*60}")
-print("Day 11 complete. DataCollectorAgent working.")
-print("Outputs: CollectorOutput Pydantic model validated.")
+print("Day 12 complete. SentimentAgent working.")
+print("DataCollector + Sentiment agents both producing typed outputs.")
 print(f"{'='*60}")
